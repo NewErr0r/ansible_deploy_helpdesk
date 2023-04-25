@@ -1,0 +1,88 @@
+--- 
+- name: Deploy Help Desk system 'OTRS' on Alt Server 10.1
+  hosts: otrs
+  become: true
+  vars_files: vars/main.yml
+
+  tasks: 
+    - name: Update the package database
+      apt_rpm:
+        update_cache: true
+
+    - name: Installing the necessary packages
+      apt_rpm:
+        name: '{{ list_packages }}' 
+        state: present
+
+    - name: Enable daemon 'httpd2'
+      service: 
+        name: httpd2
+        enabled: yes
+
+    - name: Check system database postgresql
+      stat:
+        path: '{{ postgresql_data_dir }}/pg_hba.conf'
+      register: postgres_data
+      
+
+    - name: Initialize system databases
+      command: 
+        cmd: '{{ postgresql_init_path }} initdb'
+      when: not postgres_data.stat.exists
+
+    - name: Started and enabled postgresql
+      service:
+        name: postgresql
+        state: started 
+        enabled: yes
+
+    - name: Create PostgreSQL database
+      postgresql_db:
+        name: "{{ db_name }}"
+
+    - name: Create PostgreSQL user
+      postgresql_user:
+        db: "{{ db_name }}"
+        name: "{{ db_user }}"
+        password: "{{ db_pass }}"
+        priv: ALL
+        state: present
+
+    - name: Grant privileges to PostgreSQL user
+      postgresql_privs:
+        db: "{{ db_name }}"
+        privs: ALL
+        type: database
+        role: "{{ db_user }}"
+        state: present
+
+    - name: Assign a database owner
+      postgresql_db:
+        name: "{{ db_name }}"
+        owner: "{{ db_user }}"
+
+    - name: Add httpd-addon.d=yes to 999-otrs.conf
+      lineinfile:
+        path: /etc/httpd2/conf/extra-start.d/999-otrs.conf
+        line: 'httpd-addon.d=yes'
+        create: yes
+
+    - name: Configuration httpd2
+      shell: | 
+        alternatives-manual /usr/sbin/httpd2 /usr/sbin/httpd2.prefork
+        alternatives-update
+        a2enextra httpd-addon.d
+
+    - name: Restarted httpd2 
+      service:  
+        name: httpd2
+        state: restarted
+
+    - debug:
+        msg:
+          - "Open a web browser 'http://{{ ansible_host }}/otrs/installer.pl' for further configuration via the web interface"
+          - "################################################"
+          - "database name ---> '{{ db_name }}'"
+          - "databese user ---> '{{ db_user }}'"
+          - "database pass ---> '{{ db_pass }}'"
+          - "################################################"

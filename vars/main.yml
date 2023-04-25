@@ -1,0 +1,17 @@
+---
+version_postgresql: '15'
+list_packages:
+  - postgresql{{ version_postgresql }}-server
+  - otrs
+  - otrs-apache2
+  - python3-module-psycopg2
+  - postgresql{{ version_postgresql }}-perl
+  - perl-DBD-Pg
+  - apache2-httpd-prefork
+postgresql_init_path: /etc/init.d/postgresql
+postgresql_data_dir: /var/lib/pgsql/data
+
+# postgresql date
+db_name: 'otrs'
+db_user: 'otrs'
+db_pass: 'otrs'
